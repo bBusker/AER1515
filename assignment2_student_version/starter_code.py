@@ -7,7 +7,7 @@ import os
 # Shichen Lu Added
 import glob
 import matplotlib
-matplotlib.use("TkAgg")
+# matplotlib.use("TkAgg")
 
 class FrameCalib:
     """Frame Calibration
@@ -326,21 +326,24 @@ def q3(training = True):
 
         # Matching
         bf_matcher = cv.BFMatcher()
-        matches = bf_matcher.match(des_right, des_left)
+        matches = bf_matcher.knnMatch(des_right, des_left, k=2)
 
         # Outlier Rejection
         pts_left = []
         pts_right = []
-        for match in matches:
-            pts_left.append(kp_left[match.trainIdx].pt)
-            pts_right.append(kp_right[match.queryIdx].pt)
+        good_matches = []
+        for (match1, match2) in matches:
+            if match1.distance < match2.distance*0.5:
+                good_matches.append(match1)
+                pts_left.append(kp_left[match1.trainIdx].pt)
+                pts_right.append(kp_right[match1.queryIdx].pt)
         pts_left = np.array(pts_left)
         pts_right = np.array(pts_right)
-        F, mask = cv.findFundamentalMat(pts_left, pts_right, cv.FM_RANSAC, 1, 0.99, 1000000)
+        F, mask = cv.findFundamentalMat(pts_left, pts_right, cv.FM_LMEDS, 1, 0.99, 1000)
         # pts_left = pts_left[mask.ravel() == 1]
         # pts_right = pts_right[mask.ravel() == 1]
-        matches = np.array(matches)[mask.ravel() == 1]
-        print(np.count_nonzero(mask))
+        matches = np.array(good_matches)[mask.ravel() == 1]
+        print(f"Good matches: {len(good_matches)}")
         print(f"Matches after RANSAC: {len(matches)}")
 
         # Read calibration
@@ -377,9 +380,11 @@ def q3(training = True):
         if not os.path.exists(result_imgs_dir):
             os.makedirs(result_imgs_dir)
 
-        img_with_matches = cv.drawMatches(img_left, kp_left, img_right, kp_right, matches[:30], None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        img_with_matches = cv.drawMatches(img_left, kp_left, img_right, kp_right, matches, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv.imwrite(f"{result_imgs_dir}P3_{'training' if training else 'test'}_{sample_name}_matches.png", img_with_matches)
-        plt.imshow(img_with_matches)
+        fig, ax = plt.subplots(figsize=(12,8))
+        ax.imshow(img_with_matches)
+        ax.set_title(sample_name)
         plt.show()
 
 
@@ -404,7 +409,7 @@ def test_depth(matches_filepath, gt_img_filepath):
     print(f"RMSE: {np.std(depth_diffs)}")
     print(f"Top10 Diff: {depth_diffs[np.argsort(depth_diffs)[-10:]]}")
     print(f"Bot10 Diff: {depth_diffs[np.argsort(depth_diffs)[:10]]}")
-    print(f"Estimated Correct Matches: {np.count_nonzero(depth_diffs < 15)}/{len(lines) - unchecked}")
+    print(f"Estimated Correct Matches: {np.count_nonzero(depth_diffs < 5)}/{len(lines) - unchecked}")
     # plt.hist(depth_diffs, bins=100)
     # plt.show()
 
@@ -413,5 +418,5 @@ if __name__ == "__main__":
     # q1()
     # q2()
     q3()
-    # for sample in ['000001', '000002', '000003', '000004', '000005', '000006', '000007', '000008', '000009', '000010']:
-    #     test_depth(f"./result_matches/P3_results_training_{sample}.txt", f"./training/gt_depth_map/{sample}.png")
+    for sample in ['000001', '000002', '000003', '000004', '000005', '000006', '000007', '000008', '000009', '000010']:
+        test_depth(f"./result_matches/P3_results_training_{sample}.txt", f"./training/gt_depth_map/{sample}.png")
