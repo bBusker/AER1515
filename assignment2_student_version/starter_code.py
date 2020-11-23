@@ -7,7 +7,6 @@ import os
 # Shichen Lu Added
 import glob
 import matplotlib
-# matplotlib.use("TkAgg")
 
 class FrameCalib:
     """Frame Calibration
@@ -245,13 +244,13 @@ def q2(training = True):
         kp_left, des_left, kp_right, des_right = kp_left[0:1000], des_left[0:1000], kp_right[0:1000], des_right[0:1000]
 
         # Matching
-        bf_matcher = cv.BFMatcher()
+        bf_matcher = cv.BFMatcher(normType=cv.NORM_L1)
         # Create mask to enforce epipolar constraint and positive disparities only
         mask_mtx = np.zeros((1000, 1000), dtype=np.uint8)
         for i in range(1000):
             for j in range(1000):
                 if kp_left[i].pt[0] < kp_right[j].pt[0]: continue
-                if abs(kp_left[i].pt[1] - kp_right[j].pt[1]) < 5:
+                if abs(kp_left[i].pt[1] - kp_right[j].pt[1]) < 1:
                     mask_mtx[i][j] = 1
         matches = bf_matcher.match(des_left, des_right, mask_mtx)
 
@@ -268,8 +267,8 @@ def q2(training = True):
             pt_left = kp_left[match.queryIdx].pt
             pt_right = kp_right[match.trainIdx].pt
             disparity = pt_left[0] - pt_right[0]
-            pixel_u_list.append(pt_left[0])
-            pixel_v_list.append(pt_left[1])
+            pixel_u_list.append(round(pt_left[0]))
+            pixel_v_list.append(round(pt_left[1]))
             disparity_list.append(disparity)
             depth_list.append(stereo_calib.f * stereo_calib.baseline / disparity)
 
@@ -289,10 +288,10 @@ def q2(training = True):
         if not os.path.exists(result_imgs_dir):
             os.makedirs(result_imgs_dir)
 
-        img_with_matches = cv.drawMatches(img_left, kp_left, img_right, kp_right, matches[0:100], None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        img_with_matches = cv.drawMatches(img_left, kp_left, img_right, kp_right, matches, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv.imwrite(f"{result_imgs_dir}P2_{'training' if training else 'test'}_{sample_name}_matches.png", img_with_matches)
-        # plt.imshow(img_with_matches)
-        # plt.show()
+        plt.imshow(img_with_matches)
+        plt.show()
 
 def q3(training = True):
     ## Input
@@ -325,23 +324,35 @@ def q3(training = True):
         kp_left, des_left, kp_right, des_right = kp_left[0:1000], des_left[0:1000], kp_right[0:1000], des_right[0:1000]
 
         # Matching
-        bf_matcher = cv.BFMatcher()
-        matches = bf_matcher.knnMatch(des_right, des_left, k=2)
+        bf_matcher = cv.BFMatcher(normType=cv.NORM_L1)
+        mask_mtx = np.zeros((1000, 1000), dtype=np.uint8)
+        for i in range(1000):
+            for j in range(1000):
+                if kp_left[i].pt[0] < kp_right[j].pt[0]: continue
+                else: mask_mtx[j][i] = 1
+        matches = bf_matcher.knnMatch(des_right, des_left, k=2, mask=mask_mtx)
 
         # Outlier Rejection
         pts_left = []
         pts_right = []
         good_matches = []
-        for (match1, match2) in matches:
-            if match1.distance < match2.distance*0.5:
+        for i in range(len(matches)):
+            if len(matches[i]) == 0:  # Check for empty matches
+                continue
+            elif len(matches[i]) == 1:  # If only one match, add to good_matches
+                match1 = matches[i][0]
                 good_matches.append(match1)
                 pts_left.append(kp_left[match1.trainIdx].pt)
                 pts_right.append(kp_right[match1.queryIdx].pt)
+            elif len(matches[i]) == 2:  # If multiple matches, use Lowe's ratio test
+                match1, match2 = matches[i]
+                if match1.distance < match2.distance*0.5:
+                    good_matches.append(match1)
+                    pts_left.append(kp_left[match1.trainIdx].pt)
+                    pts_right.append(kp_right[match1.queryIdx].pt)
         pts_left = np.array(pts_left)
         pts_right = np.array(pts_right)
-        F, mask = cv.findFundamentalMat(pts_left, pts_right, cv.FM_LMEDS, 1, 0.99, 1000)
-        # pts_left = pts_left[mask.ravel() == 1]
-        # pts_right = pts_right[mask.ravel() == 1]
+        F, mask = cv.findFundamentalMat(pts_left, pts_right, cv.FM_RANSAC, 1, 0.99, 10000)
         matches = np.array(good_matches)[mask.ravel() == 1]
         print(f"Good matches: {len(good_matches)}")
         print(f"Matches after RANSAC: {len(matches)}")
@@ -359,6 +370,7 @@ def q3(training = True):
             pt_left = kp_left[match.trainIdx].pt
             pt_right = kp_right[match.queryIdx].pt
             disparity = pt_left[0] - pt_right[0]
+            if disparity < 0: raise ValueError("Negative disparity")
             pixel_u_list.append(pt_left[0])
             pixel_v_list.append(pt_left[1])
             disparity_list.append(disparity)
@@ -380,7 +392,7 @@ def q3(training = True):
         if not os.path.exists(result_imgs_dir):
             os.makedirs(result_imgs_dir)
 
-        img_with_matches = cv.drawMatches(img_left, kp_left, img_right, kp_right, matches, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        img_with_matches = cv.drawMatches(img_right, kp_right, img_left, kp_left, matches, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv.imwrite(f"{result_imgs_dir}P3_{'training' if training else 'test'}_{sample_name}_matches.png", img_with_matches)
         fig, ax = plt.subplots(figsize=(12,8))
         ax.imshow(img_with_matches)
@@ -388,7 +400,18 @@ def q3(training = True):
         plt.show()
 
 
-def test_depth(matches_filepath, gt_img_filepath):
+def test_results(part_num):
+    if part_num not in [2, 3]:
+        raise ValueError("Can only test for part 2 or part 3")
+
+    tot_RMSE = 0
+    samples = ['000001', '000002', '000003', '000004', '000005', '000006', '000007', '000008', '000009', '000010']
+    for sample in samples:
+        tot_RMSE += test_depth_img(f"./result_matches/P{part_num}_results_training_{sample}.txt", f"./training/gt_depth_map/{sample}.png")
+    print(f"Avg RMSE: {tot_RMSE/len(samples)}")
+
+
+def test_depth_img(matches_filepath, gt_img_filepath):
     gt_img = cv.imread(gt_img_filepath, cv.IMREAD_GRAYSCALE)
     depth_diffs = []
     unchecked = 0
@@ -403,20 +426,21 @@ def test_depth(matches_filepath, gt_img_filepath):
                 continue
             depth_diffs.append(abs(est_depth - gt_depth))
     depth_diffs = np.array(depth_diffs)
+    RMSE = np.sqrt(np.sum(depth_diffs**2)/(len(depth_diffs)))
     print("-------------------------------------------------------------------------")
     print(f"Evalutaing [{matches_filepath}] against [{gt_img_filepath}]")
     print(f"Avg Diff: {np.average(depth_diffs)}")
-    print(f"RMSE: {np.std(depth_diffs)}")
+    print(f"RMSE: {RMSE}")
     print(f"Top10 Diff: {depth_diffs[np.argsort(depth_diffs)[-10:]]}")
     print(f"Bot10 Diff: {depth_diffs[np.argsort(depth_diffs)[:10]]}")
-    print(f"Estimated Correct Matches: {np.count_nonzero(depth_diffs < 5)}/{len(lines) - unchecked}")
-    # plt.hist(depth_diffs, bins=100)
-    # plt.show()
+    print(f"Estimated Correct Matches: {np.count_nonzero(depth_diffs < 3)}/{len(lines) - unchecked}")
+    return RMSE
 
 
 if __name__ == "__main__":
+    # matplotlib.use("TkAgg")
     # q1()
-    # q2()
+    # q2(training=False)
     q3()
-    for sample in ['000001', '000002', '000003', '000004', '000005', '000006', '000007', '000008', '000009', '000010']:
-        test_depth(f"./result_matches/P3_results_training_{sample}.txt", f"./training/gt_depth_map/{sample}.png")
+    test_results(part_num=3)
+
