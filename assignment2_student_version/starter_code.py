@@ -253,6 +253,7 @@ def q2(training = True):
                 if abs(kp_left[i].pt[1] - kp_right[j].pt[1]) < 1:
                     mask_mtx[i][j] = 1
         matches = bf_matcher.match(des_left, des_right, mask_mtx)
+        print(f"Matches: {len(matches)}")
 
         # Read calibration
         frame_calib = read_frame_calib(calib_dir + '/' + sample_name + '.txt')
@@ -405,10 +406,14 @@ def test_results(part_num):
         raise ValueError("Can only test for part 2 or part 3")
 
     tot_RMSE = 0
+    tot_match_est = 0
     samples = ['000001', '000002', '000003', '000004', '000005', '000006', '000007', '000008', '000009', '000010']
     for sample in samples:
-        tot_RMSE += test_depth_img(f"./result_matches/P{part_num}_results_training_{sample}.txt", f"./training/gt_depth_map/{sample}.png")
+        RMSE, match_est = test_depth_img(f"./result_matches/P{part_num}_results_training_{sample}.txt", f"./training/gt_depth_map/{sample}.png")
+        tot_RMSE += RMSE
+        tot_match_est += match_est
     print(f"Avg RMSE: {tot_RMSE/len(samples)}")
+    print(f"Avg Estimated Correct Matches %: {tot_match_est/len(samples)}")
 
 
 def test_depth_img(matches_filepath, gt_img_filepath):
@@ -427,20 +432,21 @@ def test_depth_img(matches_filepath, gt_img_filepath):
             depth_diffs.append(abs(est_depth - gt_depth))
     depth_diffs = np.array(depth_diffs)
     RMSE = np.sqrt(np.sum(depth_diffs**2)/(len(depth_diffs)))
+    match_est = (np.count_nonzero(depth_diffs < 3))/(len(lines) - unchecked)
     print("-------------------------------------------------------------------------")
     print(f"Evalutaing [{matches_filepath}] against [{gt_img_filepath}]")
     print(f"Avg Diff: {np.average(depth_diffs)}")
     print(f"RMSE: {RMSE}")
     print(f"Top10 Diff: {depth_diffs[np.argsort(depth_diffs)[-10:]]}")
     print(f"Bot10 Diff: {depth_diffs[np.argsort(depth_diffs)[:10]]}")
-    print(f"Estimated Correct Matches: {np.count_nonzero(depth_diffs < 3)}/{len(lines) - unchecked}")
-    return RMSE
+    print(f"Estimated Correct Matches %: {match_est}")
+    return RMSE, match_est
 
 
 if __name__ == "__main__":
     # matplotlib.use("TkAgg")
     # q1()
-    # q2(training=False)
-    q3(training=False)
-    # test_results(part_num=3)
+    q2(training=True)
+    # q3(training=True)
+    test_results(part_num=2)
 
