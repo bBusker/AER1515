@@ -432,7 +432,7 @@ def test_results(part_num):
         RMSE, match_est = test_depth_img(f"./result_matches/P{part_num}_results_training_{sample}.txt", f"./training/gt_depth_map/{sample}.png")
         tot_RMSE += RMSE
         tot_match_est += match_est
-    print("#########################################################"
+    print("######################################################################"
           "")
     print(f"Avg RMSE: {tot_RMSE/len(samples)}")
     print(f"Avg Estimated Correct Matches %: {tot_match_est/len(samples)}")
