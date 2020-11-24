@@ -329,8 +329,8 @@ def q3(training = True):
         for i in range(1000):
             for j in range(1000):
                 if kp_left[i].pt[0] < kp_right[j].pt[0]: continue
-                else: mask_mtx[j][i] = 1
-        matches = bf_matcher.knnMatch(des_right, des_left, k=2, mask=mask_mtx)
+                else: mask_mtx[i][j] = 1
+        matches = bf_matcher.knnMatch(des_left, des_right, k=2, mask=mask_mtx)
 
         # Outlier Rejection
         pts_left = []
@@ -342,14 +342,14 @@ def q3(training = True):
             elif len(matches[i]) == 1:  # If only one match, add to good_matches
                 match1 = matches[i][0]
                 good_matches.append(match1)
-                pts_left.append(kp_left[match1.trainIdx].pt)
-                pts_right.append(kp_right[match1.queryIdx].pt)
+                pts_left.append(kp_left[match1.queryIdx].pt)
+                pts_right.append(kp_right[match1.trainIdx].pt)
             elif len(matches[i]) == 2:  # If multiple matches, use Lowe's ratio test
                 match1, match2 = matches[i]
                 if match1.distance < match2.distance*0.5:
                     good_matches.append(match1)
-                    pts_left.append(kp_left[match1.trainIdx].pt)
-                    pts_right.append(kp_right[match1.queryIdx].pt)
+                    pts_left.append(kp_left[match1.queryIdx].pt)
+                    pts_right.append(kp_right[match1.trainIdx].pt)
         pts_left = np.array(pts_left)
         pts_right = np.array(pts_right)
         F, mask = cv.findFundamentalMat(pts_left, pts_right, cv.FM_RANSAC, 1, 0.99, 10000)
@@ -367,12 +367,12 @@ def q3(training = True):
         disparity_list = []
         depth_list = []
         for i, match in enumerate(matches):
-            pt_left = kp_left[match.trainIdx].pt
-            pt_right = kp_right[match.queryIdx].pt
+            pt_left = kp_left[match.queryIdx].pt
+            pt_right = kp_right[match.trainIdx].pt
             disparity = pt_left[0] - pt_right[0]
             if disparity < 0: raise ValueError("Negative disparity")
-            pixel_u_list.append(pt_left[0])
-            pixel_v_list.append(pt_left[1])
+            pixel_u_list.append(round(pt_left[0]))
+            pixel_v_list.append(round(pt_left[1]))
             disparity_list.append(disparity)
             depth_list.append(stereo_calib.f * stereo_calib.baseline / disparity)
 
@@ -392,7 +392,7 @@ def q3(training = True):
         if not os.path.exists(result_imgs_dir):
             os.makedirs(result_imgs_dir)
 
-        img_with_matches = cv.drawMatches(img_right, kp_right, img_left, kp_left, matches, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        img_with_matches = cv.drawMatches(img_left, kp_left, img_right, kp_right, matches, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv.imwrite(f"{result_imgs_dir}P3_{'training' if training else 'test'}_{sample_name}_matches.png", img_with_matches)
         fig, ax = plt.subplots(figsize=(12,8))
         ax.imshow(img_with_matches)
@@ -441,6 +441,6 @@ if __name__ == "__main__":
     # matplotlib.use("TkAgg")
     # q1()
     # q2(training=False)
-    q3()
-    test_results(part_num=3)
+    q3(training=False)
+    # test_results(part_num=3)
 
