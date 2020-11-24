@@ -191,11 +191,12 @@ def get_stereo_calibration(left_cam_mat, right_cam_mat):
 
     return stereo_calib
 
+# Question 1
 def q1():
-    ## Input
+    ## Input directory
     img_paths = glob.glob("./test/left/*") + glob.glob("./training/left/*")
 
-    ## Output
+    ## Output directory
     result_imgs_dir = "./result_imgs/"
     if not os.path.exists(result_imgs_dir):
         os.makedirs(result_imgs_dir)
@@ -205,16 +206,20 @@ def q1():
         # Already grayscale
         img = cv.imread(img_path, cv.IMREAD_GRAYSCALE)
 
-        # Feature detector
+        # Feature detector + descriptor using SIFT
         sift_detector = cv.SIFT_create(nfeatures=1000)
         kp, des = sift_detector.detectAndCompute(img, None)
         img_with_kp = cv.drawKeypoints(img, kp, None,
                                             flags=cv.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+        # Output image
         cv.imwrite(result_imgs_dir + f'{img_path[2:].replace("/", "_")}_keypoints.jpg', img_with_kp)
 
 
+# Qusetion 2
 def q2(training = True):
-    ## Input
+    print("RUNNING PART 2")
+    # Input Directory
     if training:
         left_image_dir = os.path.abspath('./training/left')
         right_image_dir = os.path.abspath('./training/right')
@@ -227,7 +232,7 @@ def q2(training = True):
         sample_list = ['000011', '000012', '000013', '000014', '000015']
 
 
-    ## Find keypoints + matches
+    # Find keypoints + matches
     for sample_name in sample_list:
         left_image_path = left_image_dir + '/' + sample_name + '.png'
         right_image_path = right_image_dir + '/' + sample_name + '.png'
@@ -236,7 +241,7 @@ def q2(training = True):
         img_left = cv.imread(left_image_path, cv.IMREAD_GRAYSCALE)
         img_right = cv.imread(right_image_path, cv.IMREAD_GRAYSCALE)
 
-        # Get features
+        # Get features + describe
         sift_detector = cv.SIFT_create(nfeatures=1000)
         kp_left, des_left = sift_detector.detectAndCompute(img_left, None)
         kp_right, des_right = sift_detector.detectAndCompute(img_right, None)
@@ -249,8 +254,8 @@ def q2(training = True):
         mask_mtx = np.zeros((1000, 1000), dtype=np.uint8)
         for i in range(1000):
             for j in range(1000):
-                if kp_left[i].pt[0] < kp_right[j].pt[0]: continue
-                if abs(kp_left[i].pt[1] - kp_right[j].pt[1]) < 1:
+                if kp_left[i].pt[0] < kp_right[j].pt[0]: continue  # Disparity enforcement
+                if abs(kp_left[i].pt[1] - kp_right[j].pt[1]) < 1:  # Epipolar enforcement
                     mask_mtx[i][j] = 1
         matches = bf_matcher.match(des_left, des_right, mask_mtx)
         print(f"Matches: {len(matches)}")
@@ -271,13 +276,17 @@ def q2(training = True):
             pixel_u_list.append(round(pt_left[0]))
             pixel_v_list.append(round(pt_left[1]))
             disparity_list.append(disparity)
-            depth_list.append(stereo_calib.f * stereo_calib.baseline / disparity)
+            depth_list.append(stereo_calib.f * stereo_calib.baseline / disparity)  # Calculate depth via formula from slides
 
-        ## Output
+        # Output directory
         result_matches_dir = "./result_matches/"
         if not os.path.exists(result_matches_dir):
             os.makedirs(result_matches_dir)
+        result_imgs_dir = "./result_imgs/"
+        if not os.path.exists(result_imgs_dir):
+            os.makedirs(result_imgs_dir)
 
+        # Write output
         with open(f"{result_matches_dir}P2_results_{'training' if training else 'test'}_{sample_name}.txt", "a") as output_file:
             output_file.truncate(0)
             for u, v, disp, depth in zip(pixel_u_list, pixel_v_list, disparity_list, depth_list):
@@ -285,17 +294,18 @@ def q2(training = True):
                 output_file.write(line + '\n')
 
         # Draw matches
-        result_imgs_dir = "./result_imgs/"
-        if not os.path.exists(result_imgs_dir):
-            os.makedirs(result_imgs_dir)
-
         img_with_matches = cv.drawMatches(img_left, kp_left, img_right, kp_right, matches, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv.imwrite(f"{result_imgs_dir}P2_{'training' if training else 'test'}_{sample_name}_matches.png", img_with_matches)
+
+        # Show matches
         plt.imshow(img_with_matches)
         plt.show()
 
+
+# Question 3
 def q3(training = True):
-    ## Input
+    print("RUNNING PART 3")
+    # Input Directory
     if training:
         left_image_dir = os.path.abspath('./training/left')
         right_image_dir = os.path.abspath('./training/right')
@@ -308,7 +318,7 @@ def q3(training = True):
         sample_list = ['000011', '000012', '000013', '000014', '000015']
 
 
-    ## Find keypoints + matches
+    # Find keypoints + matches
     for sample_name in sample_list:
         left_image_path = left_image_dir + '/' + sample_name + '.png'
         right_image_path = right_image_dir + '/' + sample_name + '.png'
@@ -317,26 +327,29 @@ def q3(training = True):
         img_left = cv.imread(left_image_path, cv.IMREAD_GRAYSCALE)
         img_right = cv.imread(right_image_path, cv.IMREAD_GRAYSCALE)
 
-        # Get features
+        # Get features + describe
         sift_detector = cv.SIFT_create(nfeatures=1000)
         kp_left, des_left = sift_detector.detectAndCompute(img_left, None)
         kp_right, des_right = sift_detector.detectAndCompute(img_right, None)
         # Fix bug where sometimes the detector returns 1001 features
         kp_left, des_left, kp_right, des_right = kp_left[0:1000], des_left[0:1000], kp_right[0:1000], des_right[0:1000]
 
-        # Matching
+        # Matching with mask to enforce positive disparities only
         bf_matcher = cv.BFMatcher(normType=cv.NORM_L1)
         mask_mtx = np.zeros((1000, 1000), dtype=np.uint8)
         for i in range(1000):
             for j in range(1000):
-                if kp_left[i].pt[0] < kp_right[j].pt[0]: continue
+                if kp_left[i].pt[0] < kp_right[j].pt[0]: continue  # Enforce disparities
                 else: mask_mtx[i][j] = 1
-        matches = bf_matcher.knnMatch(des_left, des_right, k=2, mask=mask_mtx)
+        matches = bf_matcher.knnMatch(des_left, des_right, k=2, mask=mask_mtx)  # Knn match for Lowe's later
 
         # Outlier Rejection
+        # Need to create pts and matches arrays for future use in RANSAC and displaying
         pts_left = []
         pts_right = []
         good_matches = []
+
+        # Lowe's ratio test (note KnnMatch doesnt always produce 2 matches per KP)
         for i in range(len(matches)):
             if len(matches[i]) == 0:  # Check for empty matches
                 continue
@@ -353,8 +366,10 @@ def q3(training = True):
                     pts_right.append(kp_right[match1.trainIdx].pt)
         pts_left = np.array(pts_left)
         pts_right = np.array(pts_right)
-        F, mask = cv.findFundamentalMat(pts_left, pts_right, cv.FM_RANSAC, 1, 0.99, 10000)
-        matches = np.array(good_matches)[mask.ravel() == 1]
+
+        # RANSAC using findFundamentalMat
+        F, mask = cv.findFundamentalMat(pts_left, pts_right, cv.FM_RANSAC, ransacReprojThreshold=1, confidence=0.99, maxIters=10000)
+        matches = np.array(good_matches)[mask.ravel() == 1]  # Extract RANSAC inliers
         print(f"Good matches: {len(good_matches)}")
         print(f"Matches after RANSAC: {len(matches)}")
 
@@ -375,13 +390,18 @@ def q3(training = True):
             pixel_u_list.append(round(pt_left[0]))
             pixel_v_list.append(round(pt_left[1]))
             disparity_list.append(disparity)
-            depth_list.append(stereo_calib.f * stereo_calib.baseline / disparity)
+            depth_list.append(stereo_calib.f * stereo_calib.baseline / disparity)  # Calculate depth via formula from slides
 
-        ## Output
+        # Output Directories
         result_matches_dir = "./result_matches/"
         if not os.path.exists(result_matches_dir):
             os.makedirs(result_matches_dir)
 
+        result_imgs_dir = "./result_imgs/"
+        if not os.path.exists(result_imgs_dir):
+            os.makedirs(result_imgs_dir)
+
+        # Write output results file (written separately here for easier testing, manually combined for submission)
         with open(f"{result_matches_dir}P3_results_{'training' if training else 'test'}_{sample_name}.txt", "a") as output_file:
             output_file.truncate(0)
             for u, v, disp, depth in zip(pixel_u_list, pixel_v_list, disparity_list, depth_list):
@@ -389,18 +409,17 @@ def q3(training = True):
                 output_file.write(line + '\n')
 
         # Draw matches
-        result_imgs_dir = "./result_imgs/"
-        if not os.path.exists(result_imgs_dir):
-            os.makedirs(result_imgs_dir)
-
         img_with_matches = cv.drawMatches(img_left, kp_left, img_right, kp_right, matches, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv.imwrite(f"{result_imgs_dir}P3_{'training' if training else 'test'}_{sample_name}_matches.png", img_with_matches)
+
+        # Show matches
         fig, ax = plt.subplots(figsize=(12,8))
         ax.imshow(img_with_matches)
         ax.set_title(sample_name)
         plt.show()
 
 
+# Testing function for testing parts 2 and 3
 def test_results(part_num):
     if part_num not in [2, 3]:
         raise ValueError("Can only test for part 2 or part 3")
@@ -409,30 +428,41 @@ def test_results(part_num):
     tot_match_est = 0
     samples = ['000001', '000002', '000003', '000004', '000005', '000006', '000007', '000008', '000009', '000010']
     for sample in samples:
+        # Call helper function on each sample
         RMSE, match_est = test_depth_img(f"./result_matches/P{part_num}_results_training_{sample}.txt", f"./training/gt_depth_map/{sample}.png")
         tot_RMSE += RMSE
         tot_match_est += match_est
+    print("#########################################################"
+          "")
     print(f"Avg RMSE: {tot_RMSE/len(samples)}")
     print(f"Avg Estimated Correct Matches %: {tot_match_est/len(samples)}")
 
 
+# Testing helper function
 def test_depth_img(matches_filepath, gt_img_filepath):
+    # Read GT image
     gt_img = cv.imread(gt_img_filepath, cv.IMREAD_GRAYSCALE)
+
+    # Track depths differences and number of unchecked matches
     depth_diffs = []
     unchecked = 0
+
+    # Extract match data
     with open(matches_filepath, 'r') as f:
         lines = f.readlines()
         for line in lines:
             line_split = line.split()
             pix_x, pix_y, est_depth = float(line_split[1]), float(line_split[2]), float(line_split[4])
             gt_depth = gt_img[round(pix_y)][round(pix_x)]
-            if(gt_depth == 0):
+            if(gt_depth == 0):  # Dont factor in pixels with no GT value in calculations
                 unchecked += 1
                 continue
             depth_diffs.append(abs(est_depth - gt_depth))
     depth_diffs = np.array(depth_diffs)
-    RMSE = np.sqrt(np.sum(depth_diffs**2)/(len(depth_diffs)))
-    match_est = (np.count_nonzero(depth_diffs < 3))/(len(lines) - unchecked)
+    RMSE = np.sqrt(np.sum(depth_diffs**2)/(len(depth_diffs)))  # Calculate RMSE based on slides
+    match_est = (np.count_nonzero(depth_diffs < 3))/(len(lines) - unchecked)  # Estimated number of matches
+
+    # Print statistics
     print("-------------------------------------------------------------------------")
     print(f"Evalutaing [{matches_filepath}] against [{gt_img_filepath}]")
     print(f"Avg Diff: {np.average(depth_diffs)}")
@@ -444,9 +474,10 @@ def test_depth_img(matches_filepath, gt_img_filepath):
 
 
 if __name__ == "__main__":
-    # matplotlib.use("TkAgg")
-    # q1()
-    q2(training=True)
-    # q3(training=True)
+    # matplotlib.use("TkAgg")  # Uncomment for popup window in pycharm
+    q1()
+    q2(training=True)  # Set training=False to use test set
+    q3(training=True)  # Set training=False to use test set
     test_results(part_num=2)
+    test_results(part_num=3)
 
