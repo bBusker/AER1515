@@ -58,5 +58,21 @@ def main(train=True):
         # Save depth map
         cv.imwrite(f"{output_dir}/{sample_name}.png", depth_map)
 
+def test_results():
+    est_depth_dir = 'data/train/est_depth'
+    gt_depth_dir = 'data/train/gt_depth'
+    sample_list = ['000001', '000002', '000003', '000004', '000005', '000006', '000007', '000008', '000009', '000010']
+
+    for sample in sample_list:
+        print("##################################")
+        print(f"Processing sample {sample}")
+        est_depth = cv.imread(f"{est_depth_dir}/{sample}.png", cv.IMREAD_GRAYSCALE)
+        gt_depth = cv.imread(f"{gt_depth_dir}/{sample}.png", cv.IMREAD_GRAYSCALE)
+        gt_depth[gt_depth > 80] = 0
+        diff = cv.absdiff(est_depth, gt_depth)
+        print(f"Average depth diff: {np.average(diff)}")
+        print(f"Top10 depth diff: {np.sort(diff, None)[-10:]}")
+
 if __name__ == '__main__':
-    main()
+    # main()
+    test_results()
