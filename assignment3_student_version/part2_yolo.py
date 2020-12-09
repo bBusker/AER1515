@@ -16,10 +16,10 @@ def detect_cars(image_path):
     yolo_dir = 'yolo'
 
     # minimum probability to filter weak detections
-    confidence_th = 0.7
+    confidence_th = 0.8
 
     # threshold when applying non-maxima suppression
-    threshold = 0.6
+    threshold = 0.1
     ###########################################################
 
     # load the COCO class labels our YOLO model was trained on
@@ -121,16 +121,29 @@ def detect_cars(image_path):
     cv2.imshow("Image", image)
     cv2.waitKey(0)
 
+    # return bounding visualization image and bounding boxes
+    return image, boxes
+
 def part2(train=True):
     if train:
-        img_dir = "./data/train/left"
+        imgs_dir = "./data/train/left"
+        output_dir = "./data/train/est_bb"
         sample_list = ['000001', '000002', '000003', '000004', '000005', '000006', '000007', '000008', '000009', '000010']
     else:
-        img_dir = "./data/test/left"
+        imgs_dir = "./data/test/left"
+        output_dir = "./data/test/est_bb"
         sample_list = ['000011', '000012', '000013', '000014', '000015']
+    dirs = [imgs_dir, output_dir]
+
+    # Make dirs
+    for dir in dirs:
+        if not os.path.exists(dir):
+            os.makedirs(dir)
 
     for sample in sample_list:
-        detect_cars(f"{img_dir}/{sample}.png")
+        image, boxes = detect_cars(f"{imgs_dir}/{sample}.png")
+        cv2.imwrite(f"{output_dir}/{sample}.png", image)
+        np.save(f"{output_dir}/{sample}", boxes)
 
 
 if __name__ == "__main__":

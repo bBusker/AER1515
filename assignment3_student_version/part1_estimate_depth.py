@@ -44,7 +44,7 @@ def main(train=True):
         stereo_calib = get_stereo_calibration(frame_calib.p2, frame_calib.p3)
 
         # Calculate depth (z = f*B/disp)
-        depth_map = np.empty_like(disp_map)
+        depth_map = np.zeros_like(disp_map)
         for i in range(disp_map.shape[0]):
             for j in range(disp_map.shape[1]):
                 if disp_map[i][j] == 0:
