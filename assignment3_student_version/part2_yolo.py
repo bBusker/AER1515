@@ -8,18 +8,18 @@ import cv2
 import os
 
 
-def main():
+def detect_cars(image_path):
     ###########################################################
     # OPTIONS
     ###########################################################
-    image_path = 'data/train/left/000001.png'
+    # image_path = 'data/train/left/000001.png'
     yolo_dir = 'yolo'
 
     # minimum probability to filter weak detections
-    confidence_th =
+    confidence_th = 0.7
 
-    # threshold when applyong non-maxima suppression
-    threshold =
+    # threshold when applying non-maxima suppression
+    threshold = 0.6
     ###########################################################
 
     # load the COCO class labels our YOLO model was trained on
@@ -121,5 +121,17 @@ def main():
     cv2.imshow("Image", image)
     cv2.waitKey(0)
 
+def part2(train=True):
+    if train:
+        img_dir = "./data/train/left"
+        sample_list = ['000001', '000002', '000003', '000004', '000005', '000006', '000007', '000008', '000009', '000010']
+    else:
+        img_dir = "./data/test/left"
+        sample_list = ['000011', '000012', '000013', '000014', '000015']
+
+    for sample in sample_list:
+        detect_cars(f"{img_dir}/{sample}.png")
+
+
 if __name__ == "__main__":
-    main()
+    part2(train=True)

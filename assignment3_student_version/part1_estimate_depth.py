@@ -13,9 +13,14 @@ def main(train=True):
     # Options
     ################
     # Input dir and output dir
-    disp_dir = 'data/train/disparity'
-    output_dir = 'data/train/est_depth'
-    calib_dir = 'data/train/calib'
+    if train:
+        disp_dir = 'data/train/disparity'
+        output_dir = 'data/train/est_depth'
+        calib_dir = 'data/train/calib'
+    else:
+        disp_dir = 'data/test/disparity'
+        output_dir = 'data/test/est_depth'
+        calib_dir = 'data/test/calib'
     dirs = [disp_dir, output_dir, calib_dir]
     if train:
         sample_list = ['000001', '000002', '000003', '000004', '000005', '000006', '000007', '000008', '000009', '000010']
