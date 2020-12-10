@@ -48,8 +48,17 @@ def main(dist_thresh=5.0):
             x_max = np.clip(x+w, 0, depth_map.shape[1] - 1)
             y_min = np.clip(y, 0, depth_map.shape[0] - 1)
             y_max = np.clip(y+h, 0, depth_map.shape[0] - 1)
+
+            # tighten search range for avg value b/c pixels near edges are often not car
+            x_min_search = int(x_min + (x_max - x_min) * 0.1)
+            x_max_search = int(x_max - (x_max - x_min) * 0.1)
+            y_min_search = int(y_min + (y_max - y_min) * 0.1)
+            y_max_search = int(y_max - (y_max - y_min) * 0.1)
+
             # Estimate the average depth of the objects
-            avg_depth = np.average(depth_map[y_min:y_max, x_min:x_max])
+            depth_map_search_crop = depth_map[y_min_search:y_max_search, x_min_search:x_max_search]
+
+            avg_depth = np.sum(depth_map_search_crop)/np.count_nonzero(depth_map_search_crop)
             # Find the pixels within a certain distance from the centroid
             for i in range(x_min, x_max + 1):
                 for j in range(y_min, y_max + 1):
@@ -58,7 +67,6 @@ def main(dist_thresh=5.0):
 
         # Save the segmentation mask
         cv.imwrite(f"{output_dir}/{sample_name}.png", seg_mask)
-
 
 def test_results():
     est_seg_dir = 'data/train/est_segmentation'
@@ -102,10 +110,10 @@ def test_results():
     avg_recall /= len(sample_list)
     return avg_precision, avg_recall
 
-def search_best_precision():
+def search_best_precision(start, end, step):
     best_dist = 0
     best_precision = 0
-    for dist_thresh in np.arange(1, 10, 0.5):
+    for dist_thresh in np.arange(start, end, step):
         main(dist_thresh)
         precision, recall = test_results()
         if precision > best_precision:
@@ -113,7 +121,13 @@ def search_best_precision():
             best_precision = precision
     print(f"Best_dist: {best_dist}, Best_precision: {best_precision}")
 
+def run_once(threshold):
+    main(threshold)
+    avg_precision, avg_recall = test_results()
+    print(f"Avg Precision: {avg_precision} | Avg Recall: {avg_recall}")
+
 if __name__ == '__main__':
-    main(5.5)
-    test_results()
+    # Good thresholds 5, 5.5, 4.3
+    run_once(threshold=4.3)
+    # search_best_precision(3, 7, 0.1)
 

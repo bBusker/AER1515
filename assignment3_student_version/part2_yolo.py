@@ -16,10 +16,10 @@ def detect_cars(image_path):
     yolo_dir = 'yolo'
 
     # minimum probability to filter weak detections
-    confidence_th = 0.8
+    confidence_th = 0.7
 
     # threshold when applying non-maxima suppression
-    threshold = 0.1
+    threshold = 0.5
     ###########################################################
 
     # load the COCO class labels our YOLO model was trained on
@@ -102,10 +102,13 @@ def detect_cars(image_path):
     idxs = cv2.dnn.NMSBoxes(boxes, confidences, confidence_th,
                             threshold)
 
+    car_boxes = []
     # ensure at least one detection exists
     if len(idxs) > 0:
         # loop over the indexes we are keeping
         for i in idxs.flatten():
+            if LABELS[classIDs[i]] == "car":
+                car_boxes.append(boxes[i])
             # extract the bounding box coordinates
             (x, y) = (boxes[i][0], boxes[i][1])
             (w, h) = (boxes[i][2], boxes[i][3])
@@ -122,7 +125,7 @@ def detect_cars(image_path):
     cv2.waitKey(0)
 
     # return bounding visualization image and bounding boxes
-    return image, boxes
+    return image, np.array(car_boxes) #np.array(boxes)[idxs.flatten()]
 
 def part2(train=True):
     if train:
