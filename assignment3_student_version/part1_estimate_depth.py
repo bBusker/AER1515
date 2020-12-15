@@ -7,8 +7,8 @@ import numpy as np
 
 from assignment2_calibration_code import *
 
-def main(train=True):
 
+def generate_depth_maps(train=True):
     ################
     # Options
     ################
@@ -51,7 +51,7 @@ def main(train=True):
                     depth = 0
                 else:
                     depth = stereo_calib.f * stereo_calib.baseline / disp_map[i][j]
-                    if depth > 80 or depth < 0.1:  # Discard pixels past 80m
+                    if depth > 80 or depth < 0.1:  # Discard pixels past 80m or below 0.1m
                         depth = 0
                 depth_map[i][j] = depth
 
@@ -59,20 +59,30 @@ def main(train=True):
         cv.imwrite(f"{output_dir}/{sample_name}.png", depth_map)
 
 def test_results():
+    # Set directories
     est_depth_dir = 'data/train/est_depth'
     gt_depth_dir = 'data/train/gt_depth'
+    # Set training sample list
     sample_list = ['000001', '000002', '000003', '000004', '000005', '000006', '000007', '000008', '000009', '000010']
 
     for sample in sample_list:
         print("##################################")
         print(f"Processing sample {sample}")
+
+        # Read depth maps
         est_depth = cv.imread(f"{est_depth_dir}/{sample}.png", cv.IMREAD_GRAYSCALE)
         gt_depth = cv.imread(f"{gt_depth_dir}/{sample}.png", cv.IMREAD_GRAYSCALE)
+
+        # Discard depths above 80 in the gt depth map
         gt_depth[gt_depth > 80] = 0
+
+        # Use absdiff function because uint8 can overflow if doing normal differences
         diff = cv.absdiff(est_depth, gt_depth)
+
+        # Print info
         print(f"Average depth diff: {np.average(diff)}")
         print(f"Top10 depth diff: {np.sort(diff, None)[-10:]}")
 
 if __name__ == '__main__':
-    # main()
-    test_results()
+    generate_depth_maps(train=False)
+    # test_results()  # Uncomment to test results of training set (requires results to be generated)

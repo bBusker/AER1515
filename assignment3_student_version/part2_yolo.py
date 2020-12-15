@@ -13,12 +13,13 @@ def detect_cars(image_path):
     # OPTIONS
     ###########################################################
     # image_path = 'data/train/left/000001.png'
-    yolo_dir = 'yolo'
+    yolo_dir = 'yolov4'  # Use YOLOV4 for better accuracy
 
     # minimum probability to filter weak detections
-    confidence_th = 0.7
+    confidence_th = 0.5
 
     # threshold when applying non-maxima suppression
+    # higher = less suppression
     threshold = 0.5
     ###########################################################
 
@@ -32,8 +33,8 @@ def detect_cars(image_path):
                                dtype="uint8")
 
     # derive the paths to the YOLO weights and model configurationY
-    weightsPath = os.path.sep.join([yolo_dir, "yolov3.weights"])
-    configPath = os.path.sep.join([yolo_dir, "yolov3.cfg"])
+    weightsPath = os.path.sep.join([yolo_dir, "yolov4.weights"])  # Weights path changed to yolov4 weights
+    configPath = os.path.sep.join([yolo_dir, "yolov4.cfg"])  # CFG path changed to yolov4 cfgs
 
     # load our YOLO object detector trained on COCO dataset (80 classes)
     print("[INFO] loading YOLO from disk...")
@@ -50,8 +51,12 @@ def detect_cars(image_path):
     # construct a blob from the input image and then perform a forward
     # pass of the YOLO object detector, giving us our bounding boxes and
     # associated probabilities
-    blob = cv2.dnn.blobFromImage(image, 1 / 255.0, (416, 416),
+
+    # !!!! Increase the scale input image resolution from 416x416 to 672x672 !!!! #
+    # !!!! This reduces runtime but greatly improves performance !!!! #
+    blob = cv2.dnn.blobFromImage(image, 1 / 255.0, (672, 672),
                                  swapRB=True, crop=False)
+
     net.setInput(blob)
     start = time.time()
     layerOutputs = net.forward(ln)
@@ -102,13 +107,14 @@ def detect_cars(image_path):
     idxs = cv2.dnn.NMSBoxes(boxes, confidences, confidence_th,
                             threshold)
 
+    # store which bounding boxes belong to the cars
     car_boxes = []
     # ensure at least one detection exists
     if len(idxs) > 0:
         # loop over the indexes we are keeping
         for i in idxs.flatten():
             if LABELS[classIDs[i]] == "car":
-                car_boxes.append(boxes[i])
+                car_boxes.append(boxes[i])  # store which bounding boxes belong to the cars
             # extract the bounding box coordinates
             (x, y) = (boxes[i][0], boxes[i][1])
             (w, h) = (boxes[i][2], boxes[i][3])
@@ -124,10 +130,11 @@ def detect_cars(image_path):
     cv2.imshow("Image", image)
     cv2.waitKey(0)
 
-    # return bounding visualization image and bounding boxes
-    return image, np.array(car_boxes) #np.array(boxes)[idxs.flatten()]
+    # return bounding box visualization image and bounding boxes for cars
+    return image, np.array(car_boxes)
 
-def part2(train=True):
+def detect_boundingboxes(train=True):
+    # Set directories
     if train:
         imgs_dir = "./data/train/left"
         output_dir = "./data/train/est_bb"
@@ -143,11 +150,12 @@ def part2(train=True):
         if not os.path.exists(dir):
             os.makedirs(dir)
 
+    # Run YOLO on each sample
     for sample in sample_list:
         image, boxes = detect_cars(f"{imgs_dir}/{sample}.png")
-        cv2.imwrite(f"{output_dir}/{sample}.png", image)
-        np.save(f"{output_dir}/{sample}", boxes)
+        cv2.imwrite(f"{output_dir}/{sample}.png", image)  # Save visualization image
+        np.save(f"{output_dir}/{sample}", boxes)  # Save car bounding boxes array
 
 
 if __name__ == "__main__":
-    part2(train=True)
+    detect_boundingboxes(train=False)
